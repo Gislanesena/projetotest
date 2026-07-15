@@ -1578,6 +1578,33 @@ function renderTeamDashboard(){
   const project = getTeamProject(state.user.teamId);
   wrap.insertAdjacentHTML('beforeend', statusCardHTML(ev?ev.nome:'seu evento'));
 
+  const editalCard = document.createElement('div');
+  editalCard.className = 'edital-card';
+  if(ev){
+    const editalValor = (ev.edital || '').trim();
+    const isLink = /^https?:\/\//i.test(editalValor);
+    editalCard.innerHTML = `
+      <div class="edital-top">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.4rem;">📋</span>
+          <strong style="font-family:var(--font-display);">Edital do evento</strong>
+        </div>
+      </div>
+      <div class="readonly-block"><div class="k">Problema do hackathon</div><div class="v">${ev.problema || 'Não definido ainda.'}</div></div>
+      <div class="readonly-block"><div class="k">Regras</div><div class="v">${ev.regras || 'Não definidas ainda.'}</div></div>
+      <div class="edital-file">
+        <span class="ic">📎</span>
+        <span style="flex:1;">${
+          editalValor
+            ? (isLink ? `<a href="${editalValor}" target="_blank" rel="noopener noreferrer">${editalValor}</a>` : editalValor)
+            : 'Nenhum edital anexado ainda.'
+        }</span>
+      </div>`;
+  } else {
+    editalCard.innerHTML = '<div class="empty-state">Nenhum evento vinculado à equipe.</div>';
+  }
+  wrap.appendChild(editalCard);
+
   const infoFilled = Object.values(project.info).filter(v=>v && v.trim()).length;
   const infoTotal = Object.keys(project.info).length;
   const backlogTotal = project.backlog.todo.length + project.backlog.doing.length + project.backlog.done.length;
