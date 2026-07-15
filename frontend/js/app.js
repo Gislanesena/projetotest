@@ -754,6 +754,9 @@ function renderEdital(){
     const card = document.createElement('div');
     card.className = 'edital-card';
     const [stLabel, stClass] = STATUS_LABEL[ev.status];
+    const editalValor = (ev.edital || '').trim();
+    const isLink = /^https?:\/\//i.test(editalValor);
+    const canDownload = !!ev.editalDataUrl;
     card.innerHTML = `
       <div class="edital-top">
         <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:1.4rem;">${ev.emoji}</span><strong style="font-family:var(--font-display);">${ev.nome}</strong></div>
@@ -763,13 +766,22 @@ function renderEdital(){
       <div class="readonly-block"><div class="k">Regras</div><div class="v">${ev.regras || 'Não definidas ainda.'}</div></div>
       <div class="edital-file">
         <span class="ic">📎</span>
-        <span style="flex:1;">${ev.edital ? ev.edital : 'Nenhum edital anexado ainda.'}</span>
+        <span style="flex:1;">${
+          editalValor
+            ? (isLink ? `<a href="${editalValor}" target="_blank" rel="noopener noreferrer">${editalValor}</a>` : editalValor)
+            : 'Nenhum edital anexado ainda.'
+        }</span>
+        ${canDownload ? `<button class="btn btn-ghost btn-sm" data-dl="${ev.id}">⬇️ Baixar</button>` : ''}
         <button class="btn btn-ghost btn-sm" data-edit="${ev.id}">✏️ Atualizar</button>
       </div>`;
     wrap.appendChild(card);
   });
   setTimeout(()=>{
     wrap.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openEditalForm(eventById(b.dataset.edit))));
+    wrap.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>{
+      const ev = eventById(b.dataset.dl);
+      downloadAnexo({ nome: ev.edital || 'edital.pdf', dataUrl: ev.editalDataUrl });
+    }));
   },0);
   return wrap;
 }
@@ -778,9 +790,13 @@ function openEditalForm(ev){
   openModal(`
     <div class="modal-head"><h3>Edital · ${ev.nome}</h3><button class="modal-close-x" id="mClose">✕</button></div>
     <form id="editalForm">
-      <div class="field"><label>Problema do hackathon</label><textarea id="fEdProblema">${ev.problema}</textarea></div>
-      <div class="field"><label>Regras</label><textarea id="fEdRegras">${ev.regras}</textarea></div>
-      <div class="field"><label>Edital (nome do arquivo ou link)</label><input type="text" id="fEdEdital" value="${ev.edital}" placeholder="edital.pdf ou https://..."></div>
+      <div class="field"><label>Problema do hackathon</label><textarea id="fEdProblema">${ev.problema || ''}</textarea></div>
+      <div class="field"><label>Regras</label><textarea id="fEdRegras">${ev.regras || ''}</textarea></div>
+      <div class="field"><label>Link do edital (opcional)</label><input type="text" id="fEdEdital" value="${ev.edital || ''}" placeholder="https://... ou deixe o nome do arquivo após o upload"></div>
+      <div class="field"><label>Arquivo do edital (PDF ou outro · até 5 MB)</label>
+        <input type="file" id="fEdFile" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*">
+        <div style="color:var(--ink-faint);font-size:0.75rem;margin-top:6px;">${ev.editalDataUrl ? `Arquivo atual disponível para download: ${ev.edital || 'edital'}` : 'Nenhum arquivo enviado ainda — sem upload, a equipe não consegue baixar.'}</div>
+      </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost btn-sm" id="mCancel">Cancelar</button>
         <button type="submit" class="btn btn-solid btn-sm">Salvar edital</button>
@@ -789,11 +805,36 @@ function openEditalForm(ev){
   `);
   document.getElementById('mClose').addEventListener('click', closeModal);
   document.getElementById('mCancel').addEventListener('click', closeModal);
-  document.getElementById('editalForm').addEventListener('submit',(e)=>{
+  document.getElementById('editalForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     ev.problema = document.getElementById('fEdProblema').value.trim();
     ev.regras = document.getElementById('fEdRegras').value.trim();
-    ev.edital = document.getElementById('fEdEdital').value.trim();
+    const linkOrName = document.getElementById('fEdEdital').value.trim();
+    const fileInput = document.getElementById('fEdFile');
+    const file = fileInput.files && fileInput.files[0];
+
+    if(file){
+      if(file.size > ANEXO_MAX_BYTES){
+        showToast(`⚠️ "${file.name}" excede 5 MB.`);
+        return;
+      }
+      try{
+        ev.editalDataUrl = await readFileAsDataUrl(file);
+        ev.edital = linkOrName || file.name;
+      }catch(err){
+        console.error(err);
+        showToast('⚠️ Falha ao ler o arquivo do edital.');
+        return;
+      }
+    } else {
+      ev.edital = linkOrName;
+      if(/^https?:\/\//i.test(linkOrName)){
+        // Link externo: mantém o arquivo anterior se existir, mas o texto passa a ser o link
+      } else if(!linkOrName){
+        ev.editalDataUrl = '';
+      }
+    }
+
     closeModal();
     showToast(`✅ Edital de "${ev.nome}" atualizado.`);
     renderView();
@@ -1583,6 +1624,7 @@ function renderTeamDashboard(){
   if(ev){
     const editalValor = (ev.edital || '').trim();
     const isLink = /^https?:\/\//i.test(editalValor);
+    const canDownload = !!ev.editalDataUrl;
     editalCard.innerHTML = `
       <div class="edital-top">
         <div style="display:flex;align-items:center;gap:10px;">
@@ -1599,11 +1641,22 @@ function renderTeamDashboard(){
             ? (isLink ? `<a href="${editalValor}" target="_blank" rel="noopener noreferrer">${editalValor}</a>` : editalValor)
             : 'Nenhum edital anexado ainda.'
         }</span>
+        ${canDownload
+          ? `<button class="btn btn-ghost btn-sm" id="dlEditalBtn">⬇️ Baixar</button>`
+          : (editalValor && !isLink
+            ? `<span style="font-size:0.72rem;color:var(--ink-faint);">Arquivo ainda não disponível para download</span>`
+            : '')}
       </div>`;
   } else {
     editalCard.innerHTML = '<div class="empty-state">Nenhum evento vinculado à equipe.</div>';
   }
   wrap.appendChild(editalCard);
+  if(ev?.editalDataUrl){
+    setTimeout(()=>{
+      const btn = document.getElementById('dlEditalBtn');
+      if(btn) btn.addEventListener('click', ()=> downloadAnexo({ nome: ev.edital || 'edital.pdf', dataUrl: ev.editalDataUrl }));
+    }, 0);
+  }
 
   const infoFilled = Object.values(project.info).filter(v=>v && v.trim()).length;
   const infoTotal = Object.keys(project.info).length;
@@ -2114,13 +2167,37 @@ function fileKind(name){
   if(['ppt','pptx','key'].includes(ext)) return 'ppt';
   return 'other';
 }
+const ANEXO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
+function downloadAnexo(anexo){
+  if(!anexo?.dataUrl){
+    showToast('⚠️ Este anexo não tem conteúdo para baixar. Envie o arquivo novamente.');
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = anexo.dataUrl;
+  a.download = anexo.nome || 'anexo';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function readFileAsDataUrl(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = ()=> reject(reader.error || new Error('Falha ao ler arquivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function renderTeamAnexos(){
   const project = getTeamProject(state.user.teamId);
   const wrap = document.createElement('div');
   wrap.innerHTML = `<div class="file-drop" id="fileDrop">
       <div style="font-size:1.8rem;margin-bottom:8px;">📎</div>
       <div style="font-weight:700;">Clique para enviar arquivos</div>
-      <div style="color:var(--ink-faint);font-size:0.78rem;margin-top:4px;">PDF, imagem, vídeo, ZIP ou apresentação</div>
+      <div style="color:var(--ink-faint);font-size:0.78rem;margin-top:4px;">PDF, imagem, vídeo, ZIP ou apresentação · até 5 MB cada</div>
       <input type="file" id="fileInput" multiple style="display:none;">
     </div>
     <div class="file-list" id="fileListEl"></div>`;
@@ -2129,9 +2206,20 @@ function renderTeamAnexos(){
     const el = document.getElementById('fileListEl');
     if(project.anexos.length===0){ el.innerHTML = '<div class="empty-state">Nenhum anexo enviado ainda.</div>'; return; }
     el.innerHTML = project.anexos.map(f=>`
-      <div class="file-row"><span class="file-ic">${FILE_ICONS[f.kind]}</span><span class="file-name">${f.nome}</span><span class="file-meta">${f.tamanho}</span><button class="btn-ghost btn-sm" data-del="${f.id}">🗑️</button></div>`).join('');
+      <div class="file-row">
+        <span class="file-ic">${FILE_ICONS[f.kind]}</span>
+        <span class="file-name">${f.nome}</span>
+        <span class="file-meta">${f.tamanho}</span>
+        <button class="btn btn-ghost btn-sm" data-dl="${f.id}" ${f.dataUrl ? '' : 'disabled title="Sem conteúdo para baixar"'}>⬇️ Baixar</button>
+        <button class="btn btn-ghost btn-sm" data-del="${f.id}">🗑️</button>
+      </div>`).join('');
+    el.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>{
+      const anexo = project.anexos.find(f=>f.id===b.dataset.dl);
+      downloadAnexo(anexo);
+    }));
     el.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{
       project.anexos = project.anexos.filter(f=>f.id!==b.dataset.del);
+      persistStore();
       renderList();
     }));
   }
@@ -2140,14 +2228,37 @@ function renderTeamAnexos(){
     const drop = document.getElementById('fileDrop');
     const input = document.getElementById('fileInput');
     drop.addEventListener('click', ()=>input.click());
-    input.addEventListener('change', ()=>{
-      Array.from(input.files).forEach(f=>{
-        const sizeKb = (f.size/1024).toFixed(0);
-        project.anexos.push({id:uid('fl'), nome:f.name, tamanho: sizeKb+' KB', kind: fileKind(f.name)});
-        logChange(state.user.teamId,'Anexos','—',f.name,'upload');
-      });
-      awardXP(state.user.teamId, 'upload_apresentacao');
-      showToast(`📎 ${input.files.length} arquivo(s) adicionado(s)`);
+    input.addEventListener('change', async ()=>{
+      const files = Array.from(input.files || []);
+      if(!files.length) return;
+      let added = 0;
+      for(const f of files){
+        if(f.size > ANEXO_MAX_BYTES){
+          showToast(`⚠️ "${f.name}" excede 5 MB e não foi enviado.`);
+          continue;
+        }
+        try{
+          const dataUrl = await readFileAsDataUrl(f);
+          const sizeKb = (f.size/1024).toFixed(0);
+          project.anexos.push({
+            id: uid('fl'),
+            nome: f.name,
+            tamanho: sizeKb+' KB',
+            kind: fileKind(f.name),
+            dataUrl,
+          });
+          logChange(state.user.teamId,'Anexos','—',f.name,'upload');
+          added++;
+        }catch(err){
+          console.error(err);
+          showToast(`⚠️ Falha ao ler "${f.name}".`);
+        }
+      }
+      if(added > 0){
+        awardXP(state.user.teamId, 'upload_apresentacao');
+        persistStore();
+        showToast(`📎 ${added} arquivo(s) adicionado(s)`);
+      }
       input.value = '';
       renderList();
     });

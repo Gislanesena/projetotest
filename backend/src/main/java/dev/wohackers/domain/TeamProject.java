@@ -158,6 +158,7 @@ public class TeamProject {
         private String nome;
         private String tamanho;
         private String kind;
+        private String dataUrl;
 
         public String getId() { return id; }
         public void setId(String id) { this.id = id; }
@@ -167,6 +168,8 @@ public class TeamProject {
         public void setTamanho(String tamanho) { this.tamanho = tamanho; }
         public String getKind() { return kind; }
         public void setKind(String kind) { this.kind = kind; }
+        public String getDataUrl() { return dataUrl; }
+        public void setDataUrl(String dataUrl) { this.dataUrl = dataUrl; }
     }
 
     public static class Participant {
