@@ -945,6 +945,9 @@ function viewTeamReadonly(teamId){
   const team = state.teams.find(t=>t.id===teamId);
   const project = getTeamProject(teamId);
   const evals = evalsOfTeam(teamId);
+  const event = eventById(team.eventId);
+  const eventClosed = event?.status === 'encerrado';
+  const canEvaluate = state.user.role === 'mentora' && !eventClosed;
   openModal(`
     <div class="modal-head"><h3>${team.nome} · somente leitura</h3><button class="modal-close-x" id="mClose">✕</button></div>
     <div class="readonly-block"><div class="k">Nome do projeto</div><div class="v">${project.info.nome||'—'}</div></div>
@@ -956,9 +959,10 @@ function viewTeamReadonly(teamId){
     <div class="readonly-block"><div class="k">Backlog</div><div class="v">A Fazer: ${project.backlog.todo.length} · Fazendo: ${project.backlog.doing.length} · Concluído: ${project.backlog.done.length}</div></div>
     <div class="readonly-block"><div class="k">Documentação (prévia)</div><div class="v">${(project.documentacao||'').slice(0,240)}${project.documentacao.length>240?'…':''}</div></div>
     <div class="readonly-block"><div class="k">Avaliações já recebidas</div><div class="v">${evals.length? evals.map(e=>`${e.mentorNome}: ${evalAverage(e)}/5`).join(' · ') : 'Nenhuma ainda.'}</div></div>
+    ${eventClosed ? '<div class="readonly-block"><div class="k">Status do evento</div><div class="v">Evento encerrado — novas avaliações não estão disponíveis.</div></div>' : ''}
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" id="mCancel">Fechar</button>
-      ${state.user.role==='mentora' ? `<button class="btn btn-solid btn-sm" id="mGoEval">⭐ Avaliar esta equipe</button>` : ''}
+      ${canEvaluate ? `<button class="btn btn-solid btn-sm" id="mGoEval">⭐ Avaliar esta equipe</button>` : ''}
     </div>
   `);
   document.getElementById('mClose').addEventListener('click', closeModal);
