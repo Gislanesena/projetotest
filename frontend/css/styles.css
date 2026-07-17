@@ -147,8 +147,9 @@ body::before{content:"";position:fixed;inset:0;background:
 /* ===== toolbar / filtros ===== */
 .toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
 .toolbar-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.select-field{padding:10px 14px;border-radius:10px;background:rgba(124,58,237,0.08);border:1.5px solid rgba(124,58,237,0.3);color:var(--ink);font-size:0.85rem;font-weight:600;}
-.select-field:focus{outline:none;border-color:var(--purple-bright);}
+.select-field{padding:10px 14px;border-radius:10px;background:var(--bg-panel);border:1.5px solid rgba(124,58,237,0.3);color:var(--ink);font-size:0.85rem;font-weight:600;}
+.select-field:focus{outline:none;border-color:var(--purple-bright);background:var(--bg-panel);}
+.select-field option{background:var(--bg-panel);color:var(--ink);}
 .search-field{padding:10px 14px;border-radius:10px;background:rgba(124,58,237,0.06);border:1.5px solid rgba(124,58,237,0.25);color:var(--ink);font-size:0.85rem;min-width:200px;}
 .search-field:focus{outline:none;border-color:var(--purple-bright);}
 .empty-state{padding:50px 20px;text-align:center;color:var(--ink-dim);font-size:0.9rem;}
@@ -188,8 +189,10 @@ body::before{content:"";position:fixed;inset:0;background:
 .form-row.single{grid-template-columns:1fr;}
 @media(max-width:520px){.form-row{grid-template-columns:1fr;}}
 .field textarea{width:100%;padding:12px 14px;border-radius:10px;background:rgba(124,58,237,0.06);border:1.5px solid rgba(124,58,237,0.3);color:var(--ink);font-size:0.88rem;resize:vertical;min-height:70px;font-family:inherit;}
-.field textarea:focus,.field select:focus{outline:none;border-color:var(--purple-bright);background:rgba(124,58,237,0.12);}
-.field select{width:100%;padding:12px 14px;border-radius:10px;background:rgba(124,58,237,0.06);border:1.5px solid rgba(124,58,237,0.3);color:var(--ink);font-size:0.88rem;}
+.field textarea:focus,.field select:focus{outline:none;border-color:var(--purple-bright);}
+.field select{width:100%;padding:12px 14px;border-radius:10px;background:var(--bg-panel);border:1.5px solid rgba(124,58,237,0.3);color:var(--ink);font-size:0.88rem;}
+.field select:focus{background:var(--bg-panel);}
+.field select option{background:var(--bg-panel);color:var(--ink);}
 .color-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
 .color-swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .15s ease;}
 .color-swatch:hover{transform:scale(1.15);}
