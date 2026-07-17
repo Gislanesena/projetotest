@@ -1413,14 +1413,7 @@ function confirmDeleteTeam(id){
 }
 
 function viewTeamProduction(id){
-  const tm = state.teams.find(t=>t.id===id);
-  openModal(`
-    <div class="modal-head"><h3>${tm.nome} · produção completa</h3><button class="modal-close-x" id="mClose">✕</button></div>
-    <p class="confirm-text">O admin tem acesso irrestrito a tudo que a equipe produziu. Documentação técnica, arquitetura, backlog, pitch e anexos completos entram na próxima fase (Painel da Equipe).</p>
-    <div class="modal-actions"><button class="btn btn-outline btn-sm" id="mCancel">Fechar</button></div>
-  `);
-  document.getElementById('mClose').addEventListener('click', closeModal);
-  document.getElementById('mCancel').addEventListener('click', closeModal);
+  viewTeamReadonly(id);
 }
 
 function renderPlaceholder(){
