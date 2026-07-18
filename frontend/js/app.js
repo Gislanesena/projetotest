@@ -795,6 +795,7 @@ function renderEdital(){
           }</span>
           ${canDownload ? `<button class="btn btn-ghost btn-sm" data-dl="${ev.id}">⬇️ Baixar</button>` : ''}
           <button class="btn btn-ghost btn-sm" data-edit="${ev.id}">✏️ Atualizar</button>
+          <button class="btn btn-ghost btn-sm" data-del-edital="${ev.id}">🗑️ Excluir</button>
         </div>`;
       list.appendChild(card);
     });
@@ -807,8 +808,39 @@ function renderEdital(){
       const ev = eventById(b.dataset.dl);
       downloadAnexo({ nome: ev.edital || 'edital.pdf', dataUrl: ev.editalDataUrl });
     }));
+    list.querySelectorAll('[data-del-edital]').forEach(b=>b.addEventListener('click',()=>confirmDeleteEdital(b.dataset.delEdital)));
   },0);
   return wrap;
+}
+
+function confirmDeleteEdital(eventId){
+  const ev = eventById(eventId);
+  if(!ev) return;
+  openModal(`
+    <div class="modal-head"><h3>Excluir edital</h3><button class="modal-close-x" id="mClose">✕</button></div>
+    <p class="confirm-text">Remover o edital de <strong>${ev.nome}</strong>? O evento continua cadastrado; apenas problema, regras e arquivo/link do edital serão limpos.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" id="mCancel">Cancelar</button>
+      <button class="btn btn-danger btn-sm" id="mConfirm">Excluir edital</button>
+    </div>
+  `);
+  document.getElementById('mClose').addEventListener('click', closeModal);
+  document.getElementById('mCancel').addEventListener('click', closeModal);
+  document.getElementById('mConfirm').addEventListener('click', async ()=>{
+    ev.problema = '';
+    ev.regras = '';
+    ev.edital = '';
+    ev.editalDataUrl = '';
+    try{
+      await persistStoreNow();
+      closeModal();
+      showToast(`🗑️ Edital de "${ev.nome}" excluído.`);
+      renderView();
+    }catch(err){
+      console.error(err);
+      showToast('⚠️ Não foi possível excluir o edital.');
+    }
+  });
 }
 
 function openNewEditalForm(){
