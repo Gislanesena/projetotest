@@ -105,25 +105,34 @@ async function hydrateFromStore(){
   state.stats.avaliacoes = state.evaluations.length;
 }
 
+function storeSnapshot(){
+  return {
+    events: state.events,
+    teams: state.teams,
+    mentors: state.mentors,
+    evaluations: state.evaluations,
+    xpLog: state.xpLog,
+    teamProjects: state.teamProjects,
+    cronograma: state.cronograma,
+    settings: state.settings,
+    stats: state.stats,
+    chart: state.chart,
+    rankEquipes: state.rankEquipes,
+    rankEngajamento: state.rankEngajamento,
+    rankMentoras: state.rankMentoras,
+  };
+}
+
 function persistStore(){
   clearTimeout(window.__woPersistTimer);
   window.__woPersistTimer = setTimeout(()=>{
-    Api.putStore({
-      events: state.events,
-      teams: state.teams,
-      mentors: state.mentors,
-      evaluations: state.evaluations,
-      xpLog: state.xpLog,
-      teamProjects: state.teamProjects,
-      cronograma: state.cronograma,
-      settings: state.settings,
-      stats: state.stats,
-      chart: state.chart,
-      rankEquipes: state.rankEquipes,
-      rankEngajamento: state.rankEngajamento,
-      rankMentoras: state.rankMentoras,
-    }).catch(err => console.error('Falha ao persistir no backend Java:', err));
+    Api.putStore(storeSnapshot()).catch(err => console.error('Falha ao persistir no backend Java:', err));
   }, 350);
+}
+
+function persistStoreNow(){
+  clearTimeout(window.__woPersistTimer);
+  return Api.putStore(storeSnapshot());
 }
 
 const loginForm = document.getElementById('loginForm');
@@ -787,57 +796,105 @@ function renderEdital(){
 }
 
 function openEditalForm(ev){
+  let pendingRemove = false;
   openModal(`
     <div class="modal-head"><h3>Edital · ${ev.nome}</h3><button class="modal-close-x" id="mClose">✕</button></div>
     <form id="editalForm">
       <div class="field"><label>Problema do hackathon</label><textarea id="fEdProblema">${ev.problema || ''}</textarea></div>
       <div class="field"><label>Regras</label><textarea id="fEdRegras">${ev.regras || ''}</textarea></div>
-      <div class="field"><label>Link do edital (opcional)</label><input type="text" id="fEdEdital" value="${ev.edital || ''}" placeholder="https://... ou deixe o nome do arquivo após o upload"></div>
+      <div class="field"><label>Link do edital (opcional)</label><input type="text" id="fEdEdital" value="${ev.edital || ''}" placeholder="https://... ou nome do arquivo"></div>
       <div class="field"><label>Arquivo do edital (PDF ou outro · até 5 MB)</label>
+        <div class="edital-file" id="editalCurrentFile" style="margin-top:0;margin-bottom:10px;${ev.editalDataUrl ? '' : 'display:none;'}">
+          <span class="ic">📎</span>
+          <span style="flex:1;" id="editalCurrentName">${ev.editalDataUrl ? (ev.edital || 'edital') : ''}</span>
+          <button type="button" class="btn btn-ghost btn-sm" id="editalDlBtn" ${ev.editalDataUrl ? '' : 'style="display:none"'}>⬇️ Baixar</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="editalRemoveBtn" ${ev.editalDataUrl ? '' : 'style="display:none"'}>🗑️ Remover</button>
+        </div>
         <input type="file" id="fEdFile" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*">
-        <div style="color:var(--ink-faint);font-size:0.75rem;margin-top:6px;">${ev.editalDataUrl ? `Arquivo atual disponível para download: ${ev.edital || 'edital'}` : 'Nenhum arquivo enviado ainda — sem upload, a equipe não consegue baixar.'}</div>
+        <div id="editalFileHint" style="color:var(--ink-faint);font-size:0.75rem;margin-top:6px;">${
+          ev.editalDataUrl
+            ? 'Arquivo já salvo. Escolha outro ficheiro apenas se quiser substituir.'
+            : 'Nenhum arquivo salvo ainda — selecione um ficheiro e clique em Salvar.'
+        }</div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost btn-sm" id="mCancel">Cancelar</button>
-        <button type="submit" class="btn btn-solid btn-sm">Salvar edital</button>
+        <button type="submit" class="btn btn-solid btn-sm" id="editalSaveBtn">Salvar edital</button>
       </div>
     </form>
   `);
   document.getElementById('mClose').addEventListener('click', closeModal);
   document.getElementById('mCancel').addEventListener('click', closeModal);
+
+  const fileInput = document.getElementById('fEdFile');
+  const hint = document.getElementById('editalFileHint');
+  const currentBox = document.getElementById('editalCurrentFile');
+  const currentName = document.getElementById('editalCurrentName');
+
+  fileInput.addEventListener('change', ()=>{
+    const file = fileInput.files && fileInput.files[0];
+    pendingRemove = false;
+    if(file){
+      currentBox.style.display = '';
+      currentName.textContent = file.name + ' (novo · será salvo ao confirmar)';
+      hint.textContent = 'Ficheiro selecionado. Clique em Salvar edital para manter disponível.';
+      document.getElementById('editalDlBtn').style.display = 'none';
+      document.getElementById('editalRemoveBtn').style.display = '';
+      const linkField = document.getElementById('fEdEdital');
+      if(!linkField.value.trim() || !/^https?:\/\//i.test(linkField.value.trim())){
+        linkField.value = file.name;
+      }
+    }
+  });
+
+  document.getElementById('editalDlBtn').addEventListener('click', ()=>{
+    if(ev.editalDataUrl) downloadAnexo({ nome: ev.edital || 'edital.pdf', dataUrl: ev.editalDataUrl });
+  });
+  document.getElementById('editalRemoveBtn').addEventListener('click', ()=>{
+    pendingRemove = true;
+    fileInput.value = '';
+    currentBox.style.display = 'none';
+    currentName.textContent = '';
+    hint.textContent = 'Arquivo marcado para remoção. Clique em Salvar edital para confirmar.';
+  });
+
   document.getElementById('editalForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
+    const saveBtn = document.getElementById('editalSaveBtn');
+    saveBtn.disabled = true;
     ev.problema = document.getElementById('fEdProblema').value.trim();
     ev.regras = document.getElementById('fEdRegras').value.trim();
     const linkOrName = document.getElementById('fEdEdital').value.trim();
-    const fileInput = document.getElementById('fEdFile');
     const file = fileInput.files && fileInput.files[0];
 
-    if(file){
-      if(file.size > ANEXO_MAX_BYTES){
-        showToast(`⚠️ "${file.name}" excede 5 MB.`);
-        return;
-      }
-      try{
+    try{
+      if(pendingRemove && !file){
+        ev.editalDataUrl = '';
+        ev.edital = linkOrName;
+      } else if(file){
+        if(file.size > ANEXO_MAX_BYTES){
+          showToast(`⚠️ "${file.name}" excede 5 MB.`);
+          saveBtn.disabled = false;
+          return;
+        }
         ev.editalDataUrl = await readFileAsDataUrl(file);
         ev.edital = linkOrName || file.name;
-      }catch(err){
-        console.error(err);
-        showToast('⚠️ Falha ao ler o arquivo do edital.');
-        return;
+      } else {
+        ev.edital = linkOrName;
+        if(!linkOrName && !ev.editalDataUrl){
+          ev.editalDataUrl = '';
+        }
       }
-    } else {
-      ev.edital = linkOrName;
-      if(/^https?:\/\//i.test(linkOrName)){
-        // Link externo: mantém o arquivo anterior se existir, mas o texto passa a ser o link
-      } else if(!linkOrName){
-        ev.editalDataUrl = '';
-      }
-    }
 
-    closeModal();
-    showToast(`✅ Edital de "${ev.nome}" atualizado.`);
-    renderView();
+      await persistStoreNow();
+      closeModal();
+      showToast(`✅ Edital de "${ev.nome}" atualizado e salvo.`);
+      renderView();
+    }catch(err){
+      console.error(err);
+      saveBtn.disabled = false;
+      showToast('⚠️ Não foi possível salvar o arquivo no servidor. Tente um ficheiro menor.');
+    }
   });
 }
 
