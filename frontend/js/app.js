@@ -755,44 +755,159 @@ function renderRelatorios(){
 /* ===================== ADMIN · EDITAL ===================== */
 function renderEdital(){
   const wrap = document.createElement('div');
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'toolbar';
+  toolbar.innerHTML = `
+    <div class="toolbar-left">
+      <span style="color:var(--ink-dim);font-size:0.85rem;">${state.events.length} edital(is) / evento(s)</span>
+    </div>
+    <button class="btn btn-solid btn-sm" id="newEditalBtn">＋ Novo Edital</button>`;
+  wrap.appendChild(toolbar);
+
+  const list = document.createElement('div');
+  list.id = 'editalList';
+  wrap.appendChild(list);
+
   if(state.events.length===0){
-    wrap.innerHTML = '<div class="empty-state">Cadastre um evento para gerenciar seu edital, regras e cronograma.</div>';
-    return wrap;
+    list.innerHTML = '<div class="empty-state">Nenhum edital cadastrado ainda. Clique em <strong>Novo Edital</strong> para criar o primeiro.</div>';
+  } else {
+    state.events.forEach(ev=>{
+      const card = document.createElement('div');
+      card.className = 'edital-card';
+      const [stLabel, stClass] = STATUS_LABEL[ev.status] || ['—', 'pill-yellow'];
+      const editalValor = (ev.edital || '').trim();
+      const isLink = /^https?:\/\//i.test(editalValor);
+      const canDownload = !!ev.editalDataUrl;
+      card.innerHTML = `
+        <div class="edital-top">
+          <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:1.4rem;">${ev.emoji}</span><strong style="font-family:var(--font-display);">${ev.nome}</strong></div>
+          <span class="pill ${stClass}">${stLabel}</span>
+        </div>
+        <div class="readonly-block"><div class="k">Problema do hackathon</div><div class="v">${ev.problema || 'Não definido ainda.'}</div></div>
+        <div class="readonly-block"><div class="k">Regras</div><div class="v">${ev.regras || 'Não definidas ainda.'}</div></div>
+        <div class="edital-file">
+          <span class="ic">📎</span>
+          <span style="flex:1;">${
+            editalValor
+              ? (isLink ? `<a href="${editalValor}" target="_blank" rel="noopener noreferrer">${editalValor}</a>` : editalValor)
+              : 'Nenhum edital anexado ainda.'
+          }</span>
+          ${canDownload ? `<button class="btn btn-ghost btn-sm" data-dl="${ev.id}">⬇️ Baixar</button>` : ''}
+          <button class="btn btn-ghost btn-sm" data-edit="${ev.id}">✏️ Atualizar</button>
+        </div>`;
+      list.appendChild(card);
+    });
   }
-  state.events.forEach(ev=>{
-    const card = document.createElement('div');
-    card.className = 'edital-card';
-    const [stLabel, stClass] = STATUS_LABEL[ev.status];
-    const editalValor = (ev.edital || '').trim();
-    const isLink = /^https?:\/\//i.test(editalValor);
-    const canDownload = !!ev.editalDataUrl;
-    card.innerHTML = `
-      <div class="edital-top">
-        <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:1.4rem;">${ev.emoji}</span><strong style="font-family:var(--font-display);">${ev.nome}</strong></div>
-        <span class="pill ${stClass}">${stLabel}</span>
-      </div>
-      <div class="readonly-block"><div class="k">Problema do hackathon</div><div class="v">${ev.problema || 'Não definido ainda.'}</div></div>
-      <div class="readonly-block"><div class="k">Regras</div><div class="v">${ev.regras || 'Não definidas ainda.'}</div></div>
-      <div class="edital-file">
-        <span class="ic">📎</span>
-        <span style="flex:1;">${
-          editalValor
-            ? (isLink ? `<a href="${editalValor}" target="_blank" rel="noopener noreferrer">${editalValor}</a>` : editalValor)
-            : 'Nenhum edital anexado ainda.'
-        }</span>
-        ${canDownload ? `<button class="btn btn-ghost btn-sm" data-dl="${ev.id}">⬇️ Baixar</button>` : ''}
-        <button class="btn btn-ghost btn-sm" data-edit="${ev.id}">✏️ Atualizar</button>
-      </div>`;
-    wrap.appendChild(card);
-  });
+
   setTimeout(()=>{
-    wrap.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openEditalForm(eventById(b.dataset.edit))));
-    wrap.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>{
+    document.getElementById('newEditalBtn').addEventListener('click', ()=>openNewEditalForm());
+    list.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openEditalForm(eventById(b.dataset.edit))));
+    list.querySelectorAll('[data-dl]').forEach(b=>b.addEventListener('click',()=>{
       const ev = eventById(b.dataset.dl);
       downloadAnexo({ nome: ev.edital || 'edital.pdf', dataUrl: ev.editalDataUrl });
     }));
   },0);
   return wrap;
+}
+
+function openNewEditalForm(){
+  if(state.events.length === 0){
+    showToast('⚠️ Cadastre um evento antes de criar um edital.');
+    return;
+  }
+
+  openModal(`
+    <div class="modal-head"><h3>Novo edital</h3><button class="modal-close-x" id="mClose">✕</button></div>
+    <form id="newEditalForm">
+      <div class="field"><label>Evento</label>
+        <select id="fNewEdEvento" required>
+          <option value="">Selecione um evento</option>
+          ${state.events.map(ev=>`<option value="${ev.id}">${ev.emoji || ''} ${ev.nome}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Problema do hackathon</label><textarea id="fNewEdProblema" placeholder="Qual desafio as equipes devem resolver?"></textarea></div>
+      <div class="field"><label>Regras</label><textarea id="fNewEdRegras" placeholder="Regras gerais do evento"></textarea></div>
+      <div class="field"><label>Link do edital (opcional)</label><input type="text" id="fNewEdLink" placeholder="https://... ou nome do arquivo"></div>
+      <div class="field"><label>Arquivo do edital (PDF ou outro · até 5 MB)</label>
+        <input type="file" id="fNewEdFile" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*">
+        <div id="fNewEdFileHint" style="color:var(--ink-faint);font-size:0.75rem;margin-top:6px;">Selecione o ficheiro do edital para disponibilizar às equipes.</div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost btn-sm" id="mCancel">Cancelar</button>
+        <button type="submit" class="btn btn-solid btn-sm" id="newEditalSaveBtn">Criar edital</button>
+      </div>
+    </form>
+  `);
+
+  document.getElementById('mClose').addEventListener('click', closeModal);
+  document.getElementById('mCancel').addEventListener('click', closeModal);
+
+  const eventSelect = document.getElementById('fNewEdEvento');
+  const problemaEl = document.getElementById('fNewEdProblema');
+  const regrasEl = document.getElementById('fNewEdRegras');
+  const linkField = document.getElementById('fNewEdLink');
+
+  eventSelect.addEventListener('change', ()=>{
+    const ev = eventById(eventSelect.value);
+    if(!ev) return;
+    problemaEl.value = ev.problema || '';
+    regrasEl.value = ev.regras || '';
+    linkField.value = ev.edital || '';
+  });
+
+  const fileInput = document.getElementById('fNewEdFile');
+  fileInput.addEventListener('change', ()=>{
+    const file = fileInput.files && fileInput.files[0];
+    const hint = document.getElementById('fNewEdFileHint');
+    if(file){
+      hint.textContent = `Ficheiro selecionado: ${file.name}`;
+      if(!linkField.value.trim()) linkField.value = file.name;
+    } else {
+      hint.textContent = 'Selecione o ficheiro do edital para disponibilizar às equipes.';
+    }
+  });
+
+  document.getElementById('newEditalForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const saveBtn = document.getElementById('newEditalSaveBtn');
+    const ev = eventById(eventSelect.value);
+    if(!ev){
+      showToast('⚠️ Selecione um evento para vincular o edital.');
+      return;
+    }
+
+    saveBtn.disabled = true;
+    const file = fileInput.files && fileInput.files[0];
+    let edital = linkField.value.trim();
+
+    try{
+      ev.problema = problemaEl.value.trim();
+      ev.regras = regrasEl.value.trim();
+
+      if(file){
+        if(file.size > ANEXO_MAX_BYTES){
+          showToast(`⚠️ "${file.name}" excede 5 MB.`);
+          saveBtn.disabled = false;
+          return;
+        }
+        ev.editalDataUrl = await readFileAsDataUrl(file);
+        ev.edital = edital || file.name;
+      } else {
+        ev.edital = edital;
+        if(!edital) ev.editalDataUrl = '';
+      }
+
+      await persistStoreNow();
+      closeModal();
+      showToast(`✅ Edital vinculado a "${ev.nome}".`);
+      renderView();
+    }catch(err){
+      console.error(err);
+      saveBtn.disabled = false;
+      showToast('⚠️ Não foi possível salvar o edital. Tente um ficheiro menor.');
+    }
+  });
 }
 
 function openEditalForm(ev){
