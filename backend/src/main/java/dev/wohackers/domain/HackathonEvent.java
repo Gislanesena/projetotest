@@ -10,6 +10,7 @@ public class HackathonEvent {
     private String problema;
     private String regras;
     private String edital;
+    private String editalDataUrl;
     private String status;
 
     public String getId() { return id; }
@@ -30,6 +31,8 @@ public class HackathonEvent {
     public void setRegras(String regras) { this.regras = regras; }
     public String getEdital() { return edital; }
     public void setEdital(String edital) { this.edital = edital; }
+    public String getEditalDataUrl() { return editalDataUrl; }
+    public void setEditalDataUrl(String editalDataUrl) { this.editalDataUrl = editalDataUrl; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 }
